@@ -73,4 +73,29 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
   }
 });
 
+client.on('presenceUpdate', async (oldPresence, newPresence) => {
+  const member = newPresence.member;
+  const status = newPresence.status;
+
+  if (!member || status !== 'offline') return;
+
+  const voiceChannel = member.voice?.channel;
+  if (!voiceChannel) return;
+
+  try {
+    await member.voice.setChannel(null);
+    console.log(`⛔ Disconnected ${member.user.tag} for going offline in voice`);
+
+    try {
+      await member.send(
+        `🚫 You were disconnected because you went **offline** while in a voice channel. Please stay online to remain connected.`
+      );
+    } catch (err) {
+      console.warn(`❌ Couldn't DM ${member.user.tag}:`, err.message);
+    }
+  } catch (err) {
+    console.error(`❌ Failed to disconnect ${member.user.tag}:`, err.message);
+  }
+});
+
 client.login(process.env.BOT_TOKEN);
