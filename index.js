@@ -55,13 +55,9 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         // console.log(`🟡 ${updatedMember.user.tag} status after 3min: ${status}`);
         // console.log(`🎮 Activities:`, activities.map(a => a.name).join(', ') || 'None');
 
-        if (
-          stillInVoice &&
-          (
+        if (stillInVoice && (
             status === 'offline' ||
-            (!hasRealActivity)
-          )
-        ) {
+            (!hasRealActivity))) {
           const afkChannel = guild.afkChannel;
           await updatedMember.voice.setChannel(afkChannel || null);
 
@@ -76,6 +72,45 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
           }
         } else {
           // console.log(`✅ ${updatedMember.user.tag} is good to go — active or acceptable status.`);
+        }
+
+        if (stillInVoice && hasRealActivity) {
+          const channelMembers = updatedMember.voice.channel?.members;
+
+          if (channelMembers && channelMembers.size > 1) {
+            const allGameActivities = [];
+
+            channelMembers.forEach(m => {
+              const games = m.presence?.activities?.filter(a => a.type === 0).map(a => a.name);
+              if (games && games.length > 0) {
+                allGameActivities.push({ id: m.id, game: games[0] });
+              }
+            });
+
+            const userGame = allGameActivities.find(entry => entry.id === updatedMember.id)?.game;
+            const otherGames = allGameActivities
+              .filter(entry => entry.id !== updatedMember.id)
+              .map(entry => entry.game);
+
+            const everyoneElseHasSameGame = otherGames.length > 0 && otherGames.every(g => g === otherGames[0]);
+            const isOutlier = userGame && everyoneElseHasSameGame && userGame !== otherGames[0];
+
+            if (isOutlier) {
+              const afkChannel = guild.afkChannel;
+              await updatedMember.voice.setChannel(afkChannel || null);
+
+              // console.log(`🎮 Game mismatch! Disconnected ${updatedMember.user.tag} for playing a different game: ${userGame}`);
+
+              try {
+                await updatedMember.send(
+                  `🚫 You were disconnected because you're playing **${userGame}**, which doesn't match the current group vibe (**${otherGames[0]}**). Please join again when you’re synced up!`
+                );
+              } catch (err) {
+                // console.warn(`❌ Couldn't DM ${updatedMember.user.tag}:`, err.message);
+              }
+              return;
+            }
+          }
         }
       } catch (err) {
         // console.error(`❌ Error during grace period check: ${err}`);
