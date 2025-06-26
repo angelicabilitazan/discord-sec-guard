@@ -48,28 +48,34 @@ client.on('voiceStateUpdate', async (oldState, newState) => {
         const updatedMember = await guild.members.fetch(member.id);
         const stillInVoice = updatedMember.voice.channelId === newState.channelId;
 
-        const status = updatedMember.presence?.status;
+        const status = updatedMember.presence?.status || 'offline';
         const activities = updatedMember.presence?.activities || [];
-        const hasActivity = activities.some(a => a.type !== 4); 
+        const hasRealActivity = activities.some(a => a.type !== 4); 
+
+        // console.log(`🟡 ${updatedMember.user.tag} status after 3min: ${status}`);
+        // console.log(`🎮 Activities:`, activities.map(a => a.name).join(', ') || 'None');
 
         if (
           stillInVoice &&
-          (status === 'offline' || (status !== 'online' && !hasActivity))
+          (
+            status === 'offline' ||
+            (!hasRealActivity)
+          )
         ) {
           const afkChannel = guild.afkChannel;
           await updatedMember.voice.setChannel(afkChannel || null);
 
-          // console.log(`⏱️ Disconnected ${updatedMember.user.tag} after 3 min (offline or idle without activity)`);
+          // console.log(`⏱️ Disconnected ${updatedMember.user.tag} after 3 min (offline or inactive)`);
 
           try {
             await updatedMember.send(
-              `🚫 You were disconnected after 3 minutes due to no visible activity or offline status. Please stay active to remain in the voice channel.`
+              `🚫 You were disconnected after 3 minutes due to no visible activity. Please stay active to remain in the voice channel.`
             );
           } catch (err) {
             // console.warn(`❌ Couldn't DM ${updatedMember.user.tag}:`, err.message);
           }
         } else {
-          // console.log(`✅ ${updatedMember.user.tag} is active or idle with valid activity. All good!`);
+          // console.log(`✅ ${updatedMember.user.tag} is good to go — active or acceptable status.`);
         }
       } catch (err) {
         // console.error(`❌ Error during grace period check: ${err}`);
